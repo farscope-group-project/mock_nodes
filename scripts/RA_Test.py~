@@ -1,0 +1,50 @@
+#!/usr/bin/env python
+import roslib
+import math
+roslib.load_manifest('ur_tutorial')
+import rospy
+from trajectory_msgs.msg import JointTrajectory,JointTrajectoryPoint
+from control_msgs.msg import FollowJointTrajectoryActionGoal
+
+rospy.init_node("simple_move_goal_pub")
+pub = rospy.Publisher("/arm_controller/follow_joint_trajectory/goal", FollowJointTrajectoryActionGoal, queue_size=10)
+rospy.sleep(0.5)
+
+topic_name = rospy.resolve_name("/arm_controller/follow_joint_trajectory/goal")
+rospy.loginfo("Sending goal to %s", topic_name)
+
+traj = JointTrajectory()
+traj.joint_names = ['shoulder_pan_joint', 'shoulder_lift_joint', 'elbow_joint', 'wrist_1_joint', 'wrist_2_joint', 'wrist_3_joint']
+
+now = rospy.get_rostime()
+rospy.loginfo("Current time %i %i", now.secs, now.nsecs)
+traj.header.stamp = now
+
+p1 = JointTrajectoryPoint()
+p1.positions = [1.5708, -2.36806273, 2.1275564, -1.3353514, 4.68743077 ,-0.0349066]
+p1.velocities = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+p1.time_from_start = rospy.Duration(2.0)
+traj.points.append(p1)
+
+p2 = JointTrajectoryPoint()
+p2.positions = [math.radians(100.63), math.radians(-106.49), math.radians(89.88), math.radians(-73.64), math.radians(274.08) ,math.radians(11.66)]
+p2.velocities = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+p2.time_from_start = rospy.Duration(4.0)
+traj.points.append(p2)
+
+p3 = JointTrajectoryPoint()
+p3.positions = [math.radians(90.00), math.radians(-135.68), math.radians(121.90), math.radians(-76.51), math.radians(268.67) ,math.radians(-2.00)]
+p3.velocities = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+p3.time_from_start = rospy.Duration(6.0)
+traj.points.append(p3)
+
+pe = JointTrajectoryPoint()
+pe.positions = [math.radians(74.04), math.radians(-103.26), math.radians(87.15), math.radians(-72.18), math.radians(273.71) ,math.radians(-14.99)]
+pe.velocities = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+pe.time_from_start = rospy.Duration(8.0)
+traj.points.append(pe)
+
+ag = FollowJointTrajectoryActionGoal()
+ag.goal.trajectory = traj
+
+pub.publish(ag)

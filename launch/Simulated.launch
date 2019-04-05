@@ -1,0 +1,21 @@
+<launch>
+
+  <!-- By default, we do not start a database (it can be large) -->
+
+  <!-- By default, we are not in debug mode -->
+  <arg name="debug" default="false" />
+  <!-- By default we will limit the joints -->
+  <arg name="limited" default="true"/>
+
+  <include file="$(find ur_gazebo)/launch/ur10_joint_limited.launch">
+  </include>
+
+  <!-- Start the Vision Node -->
+	<node pkg="simulated" type="VisionMockNodeClass.py" name="vsMockNode" output="screen" launch-prefix="gnome-terminal --title='Vision Mock Node' --command">
+	</node>
+
+  <!-- Start the End Effector Node -->
+	<node pkg="simulated" type="eeMockNodeClass.py" name="eeMockNode" output="screen" launch-prefix="gnome-terminal --title='EE Mock Node' --command">
+	</node>
+
+</launch>
