@@ -1,9 +1,9 @@
 #!/usr/bin/python
 import rospy
 from std_msgs.msg import Bool, String
-#from ControllerPacket import *  
-#from VisionPacket import *  
-from simulated.msg import * 
+#from ControllerPacket import *
+#from VisionPacket import *
+from simulated.msg import *
 
 class mock_vision_node():
 
@@ -13,10 +13,10 @@ class mock_vision_node():
 		self.rate = rospy.Rate(10)
 		self.sub = rospy.Subscriber('/MainController', ControllerPacket, self.controllerCallback)
 		self.pub_state = rospy.Publisher('/VisionSystem', VisionPacket,queue_size =10)
-		
+
 		# This is what the vision system is sending (publishing) to the controller
 		self.item = VisionPacket()
-		self.item.VisionStatus = 0 
+		self.item.VisionStatus = 0
 		self.item.ItemPose.position.x = 0
 		self.item.ItemPose.position.y = 0
 		self.item.ItemPose.position.z = 0
@@ -26,17 +26,17 @@ class mock_vision_node():
 		self.item.ItemPose.orientation.w = 0
 		self.item.ItemBoundingBox = [0,0,0]
 
-		
+
 	def controllerCallback(self,data):
 		# Function run every time main controller sends a message on /MainControllerPacket
-		controller_status = data.McStatus 
-		if controller_status < 16:
-			self.item.VisionStatus =  controller_status
-		else:
-			self.item.VisionStatus = 0 #May need to change this take into account error cases
-		self.update_Vision_info()	# Used to manually update different information		
+		#controller_status = data.McStatus
+		#if controller_status < 16:
+		#	self.item.VisionStatus =  controller_status
+		#else:
+		#	self.item.VisionStatus = 0 #May need to change this take into account error cases
+		self.update_Vision_info()	# Used to manually update different information
 		self.pub_state.publish(self.item)
-		
+
 	def update_Vision_info(self):
 		#print menu and get selection
 		self.print_menu()
@@ -50,7 +50,7 @@ class mock_vision_node():
 				self.item.VisionStatus = input()
 			if selected_value == 2:
 				print("Please change x")
-				self.item.ItemPose.position.x = input()	
+				self.item.ItemPose.position.x = input()
 			if selected_value == 3:
 				print("Please change y")
 				self.item.ItemPose.position.y = input()
@@ -73,13 +73,13 @@ class mock_vision_node():
 				print("Please change bounding box")
 				Boundingbox = raw_input().split(",")
 				Boundingbox = [float(i) for i in Boundingbox]
-				self.item.ItemBoundingBox = Boundingbox 
+				self.item.ItemBoundingBox = Boundingbox
 			if selected_value == 10:
 				print("---------------------------")
 				print("Vision Packet:")
-				print("---------------------------")						
+				print("---------------------------")
 				print(self.item)
-				print("---------------------------")		
+				print("---------------------------")
 			self.print_menu()
 			selected_value = input()
 
@@ -101,9 +101,9 @@ class mock_vision_node():
 		print("--------------------------------")
 		print("--------------------------------")
 
-	
-				
-if __name__ == "__main__":		
+
+
+if __name__ == "__main__":
 	 """ Run RosNode """
 print("Vision Mock Node Online")
 vs =  mock_vision_node()
