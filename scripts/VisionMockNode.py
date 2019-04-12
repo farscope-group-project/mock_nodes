@@ -14,6 +14,8 @@ class mock_vision_node():
 		self.sub = rospy.Subscriber('/MainController', ControllerPacket, self.controllerCallback)
 		self.pub_state = rospy.Publisher('/VisionSystem', VisionPacket,queue_size =10)
 
+		self.user_input=-1
+
 		# This is what the vision system is sending (publishing) to the controller
 		self.item = VisionPacket()
 		self.item.VisionStatus = 0
@@ -29,12 +31,10 @@ class mock_vision_node():
 
 	def controllerCallback(self,data):
 		# Function run every time main controller sends a message on /MainControllerPacket
-		#controller_status = data.McStatus
-		#if controller_status < 16:
-		#	self.item.VisionStatus =  controller_status
-		#else:
-		#	self.item.VisionStatus = 0 #May need to change this take into account error cases
-		self.update_Vision_info()	# Used to manually update different information
+		if self.user_input == 1:		
+			self.update_Vision_info()	# Used to manually update different information
+		else:
+			self.item.VisionStatus = data.McStatus
 		self.pub_state.publish(self.item)
 
 	def update_Vision_info(self):
@@ -81,6 +81,7 @@ class mock_vision_node():
 				print(self.item)
 				print("---------------------------")
 			self.print_menu()
+			print("Select option")
 			selected_value = input()
 
 	def print_menu(self):
@@ -106,6 +107,10 @@ class mock_vision_node():
 if __name__ == "__main__":
 	 """ Run RosNode """
 print("Vision Mock Node Online")
+user_input = -1
+while (user_input <> 0) and (user_input <> 1):
+	user_input = int(input("For vision response behaviour, 1 for user control, 0 for autonomated: "))
 vs =  mock_vision_node()
+vs.user_input = user_input
 while not rospy.is_shutdown():
 	rospy.spin()

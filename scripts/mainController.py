@@ -10,17 +10,18 @@ import math
 import rospy
 import time
 from std_msgs.msg import String
-from VisionInterfaceClass import VisionInterface
+from VisionInterface import VisionInterface
 from EEInterface import EEInterface
 from ArmInterface import ArmInterface
 import tf
 import tf2_ros
 import tf2_geometry_msgs
 import sys
-import moveit_commander
-import moveit_msgs.msg
+#import moveit_commander
+#import moveit_msgs.msg
 from geometry_msgs.msg import Pose
-from moveit_commander.conversions import pose_to_list
+#from moveit_commander.conversions import pose_to_list
+
 import json
 
 class StateMachine():
@@ -107,9 +108,12 @@ class StateMachine():
 		""" Reads the ordered dictionary and selects the next object to grasp """
 		# initialise the state and setup for a new run
 		rospy.loginfo("State 1!")
-		#self.armInterface.goHome() # Just to be sure
+		"""		
+		self.armInterface.goHome() # Just to be sure
+		"""
 		self.num_failures = 0
 		self.run_failure = False
+		self.visionInterface.set_status(-1) #set a status outside normal range
 
 		# Read JSON file (Be nice to only do this the first time through
 		self.json_read()
@@ -119,6 +123,10 @@ class StateMachine():
 		if (self.index < len(self.item_final)):
 			#Get object name and shelf location
 			self.target_item = list(self.item_final.keys())[self.index]
+			self.target_shelf = self.item_final.get(self.target_item)			
+			print("Current item to pick is %s" %self.target_item)
+			print("Current shelf to pick from is %s" %self.target_shelf)
+
 			#Goto state 2
 			next_state = 2
 		else:
@@ -140,47 +148,77 @@ class StateMachine():
 		rospy.loginfo("State 2!")
 
 		#move to bin home position for shelf location
-		#self.armInterface.gotoBin("F")
+		"""	        
+		if self.target_shelf == "bin_A":
+			self.armInterface.gotoBin("A")
+	        elif self.target_shelf == "bin_B":
+			self.armInterface.gotoBin("B")
+        	elif self.target_shelf == "bin_C":
+			self.armInterface.gotoBin("C")
+		elif self.target_shelf == "bin_D":
+			self.armInterface.gotoBin("D")
+		elif self.target_shelf == "bin_E":
+			self.armInterface.gotoBin("E")
+		else:
+			self.armInterface.gotoBin("F")
+		"""
 
 		#******do the vision sweep*****
-
 		# get the current EE position and pose
-		#original_rpy = self.armInterface.move_group.get_current_rpy()
-		#original_pose =  self.armInterface.move_group.get_current_pose().pose
+		"""		
+		original_rpy = self.armInterface.move_group.get_current_rpy()
+		original_pose =  self.armInterface.move_group.get_current_pose().pose
+		"""
 
 		#Initialise the vision System
-		#set main controller status = 0;
-		self.visionInterface.set_status(0)
+		mc_status = 0
+		self.visionInterface.set_status(mc_status)
 		self.visionInterface.set_desired_item(self.target_item)
+		self.visionInterface.set_desired_shelf(self.target_shelf)
+
 		#publish main controller status and item name
 		self.visionInterface.publish_vision_packet()
+		rospy.loginfo("I've sent the status %d to the vision system" %mc_status )
+		rospy.sleep(2)
+		vision_status = self.visionInterface.get_vision_status()
+		rospy.loginfo("I've received %d status from vision system" %vision_status)
+
 		#wait until vision system responds it's initialised
 		while self.visionInterface.get_vision_status() != 0:
 			#do nothing
 			rospy.sleep(2)
-			rospy.loginfo(self.visionInterface.get_vision_status())
+			vision_status = self.visionInterface.get_vision_status()
+			rospy.loginfo("I've received %d status from vision system" %vision_status)
+		
 		# Now create a loop to send signal to arm for position in sweep
 		# There are 16 positions numbered 1 to 16
 		# After each position send correspondign signal to Vision System
-		for i in range(1,16):
-			self.visionInterface.set_status(i)
+		
+		for i in range(0,16):
+			mc_status = mc_status + 1
+			#move the arm
+			"""
+			self.armInterface.doVisionSweep(original_rpy, original_pose, (i+1))			
+			"""
+			#tell vision system arm is in correct location
+			self.visionInterface.set_status(mc_status)
 			self.visionInterface.publish_vision_packet()
+			rospy.loginfo("I've sent the status %d to the vision system" %mc_status )
+			rospy.sleep(2)
+			vision_status = self.visionInterface.get_vision_status()			
+			rospy.loginfo("I've received %d status from vision system" %vision_status)
 			#wait until vision status matches i or 16 (may also want to add a timeout for error handling), wait
-			vision_status = self.visionInterface.get_vision_status()
-			while  vision_status!= i or vision_status!=16:
-				#self.visionInterface.publish_vision_packet()
+			while  vision_status!= (mc_status) and vision_status!=16:
 				rospy.sleep(2)
 				vision_status = self.visionInterface.get_vision_status()
-		#loop to next i
-
-		#if vision status == 16 AND i!=16 then an error has occured
+				rospy.loginfo("I've received %d status from vision system" %vision_status)
+		#if vision status == 16 AND mc_status!=16 then an error has occured
 		#log failure ****BUG HERE, HOW DOES VISION SYSTEM SIGNAL A FAULT HAS OCCURED DURING RECOGNITION WHEN CAMERA IS IN POSITION 16???
-		if not (vision_status == 16 and i!=16):
+		if not (vision_status == 16 and mc_status==16):
 			self.run_failure = True
 			return 5
 		else:
-			#Store the item location, pose and bounding box from the vision system and make available to other states
-			#Thiis is handled in the vision interface class
+			#This is handled in the vision interface class has stored the location, pose and bounding box from the vision system 
 			return 3
 
 
@@ -194,16 +232,12 @@ class StateMachine():
 		#Initialise the state
 		rospy.loginfo("State 3!")
 		failure = False
-		# self.EEInterface.toggle_vacuum(True)
-
-		#time.sleep(5)
 
 		#Move arm to the item location (including any offset needed)
-		# get the current EE position and pose
-		#original_rpy = self.armInterface.move_group.get_current_rpy()
-		#original_pose = self.armInterface.move_group.get_current_pose().pose
-		#self.armInterface.incHeight(0.12, original_rpy, original_pose)
-
+		rospy.sleep(1)
+		"""		
+		self.armInterface.incHeight(0.12, self.armInterface.move_group.get_current_rpy(), self.armInterface.move_group.get_current_pose().pose)
+		"""
 
 		#Turn on the vacuum cleaner
 		self.EEInterface.toggle_vacuum(True)
@@ -214,33 +248,63 @@ class StateMachine():
 		#Check if vacuum has turned on, if not flag and error and increase the error count"
 		if not self.EEInterface.get_vacuum_status():
 			failure = True
-			self.num_failures = self.num_failures + 1
+			self.EEInterface.toggle_vacuum(False)
+			rospy.loginfo("VACUUM FAILURE - TERMINATING")
+			exit()
 
-		if failure == False:
-			#move arm to object
-			#self.armInterface.gotoObject(0,0,0,0,0,0) #(x,y,z,aplha,belta,gamma) # This might have to hand over a quaternion instead of RPY
-			#rospy.loginfo("going down")
-			#self.armInterface.goDownInShelf(0,0,0,0,0,0)
-
-			#If item is not held, wiggle position and try again
-			if self.EEInterface.get_item_held_status()==False:
+		if not failure:
+			# Reaching into shelf
+			# The value handed to the armInterface should be calculated by the main controller depending on item pose
+			"""			
+			self.ArmInterface.goInsideShelf(-0.25)
+			"""
+			#Finish reaching into shelf
+			rospy.loginfo("going down")
+            		# Going to object
+			"""
+			self.armInterface.goDownInShelf(-0.03)
+			"""
+			# Check Item get_item_held_status
+			# If got item then no worrries
+			# else wiggle
+			if (self.EEInterface.get_item_held_status()):
+				#do nothing
+				print("item held")
+			else:
 				rospy.loginfo("Wiggle!")
-				#original_rpy = self.armInterface.move_group.get_current_rpy()
-				#original_pose = self.armInterface.move_group.get_current_pose().pose
-				#self.armInterface.wiggle(0.03,original_rpy, original_pose)
-				#self.armInterface.wiggle(-0.06,original_rpy, original_pose)
-				#self.armInterface.wiggle(0.03,original_rpy, original_pose)
-				#self.armInterface.goUpInShelf(0,0,0,0,0,0)
-			#move out of shelf to shelf bin home position
-			#original_rpy = self.armInterface.move_group.get_current_rpy()
-			#original_pose = self.armInterface.move_group.get_current_pose().pose
-			#self.armInterface.incDepth(0.05064, original_rpy, original_pose)
-			#rospy.sleep(4)
-			#Check is item held after any wiggles, if no, not add one to failure count
-			#if yes, goto state 4 (drop item)
-			if self.EEInterface.get_item_held_status()==False:
-				failure = True
-				self.num_failures = self.num_failures + 1
+				# The main controller should double check that there is enough space to wiggle either side of the item.
+				# Either by refusing to wiggle in one direction or by reducing the size of the wiggles
+				# Go up before wiggle then back down afterwards? Easy to add but not here for now
+				"""
+				self.armInterface.newWiggle(0.05)
+				"""
+				# Check Item get_item_held_status
+ 				if (self.EEInterface.get_item_held_status()):
+					# We have the item, return to the middle with it
+					"""
+					self.armInterface.incHeight(0.06, self.armInterface.move_group.get_current_rpy(), self.armInterface.move_group.get_current_pose().pose)
+					self.armInterface.newWiggle(-0.05)
+					"""					
+				else:
+					"""					
+					self.armInterface.newWiggle(-0.10)
+					"""
+					# Check Item get_item_held_status
+					if (self.EEInterface.get_item_held_status()):
+						# We have the item, return to the middle with it
+						"""						
+						self.armInterface.incHeight(0.06, self.armInterface.move_group.get_current_rpy(), self.armInterface.move_group.get_current_pose().pose)
+               			self.armInterface.newWiggle(0.05)
+						"""
+					else:
+						failure = True
+						self.num_failures += 1
+						self.EEInterface.toggle_vacuum(False)
+						# Return to middle after failure
+						"""
+						self.armInterface.incHeight(0.06, self.armInterface.move_group.get_current_rpy(), self.armInterface.move_group.get_current_pose().pose)
+						self.armInterface.newWiggle(0.05)
+						"""
 
 		#decide which state to go into next
 		#one failure, retry picking up object from starting position for the shelf bin
@@ -248,17 +312,36 @@ class StateMachine():
 		#more than two failures, give up and log error
 		if failure == True:
 			if self.num_failures is 1:
-				next_state = 3
+				"""	        
+				if self.target_shelf == "bin_A":
+					self.armInterface.gotoBin("A")
+				elif self.target_shelf == "bin_B":
+					self.armInterface.gotoBin("B")
+				elif self.target_shelf == "bin_C":
+					self.armInterface.gotoBin("C")
+				elif self.target_shelf == "bin_D":
+					self.armInterface.gotoBin("D")
+				elif self.target_shelf == "bin_E":
+					self.armInterface.gotoBin("E")
+				else:
+					self.armInterface.gotoBin("F")
+				"""
+				return 3
 			elif self.num_failures is 2:
-				next_state =  2
+			 	# turn off vaccum cleaner
+			 	self.EEInterface.toggle_vacuum(False)
+				return 2
 			else:
 				self.run_failure = True
-				next_state =  1
+			 	# turn off vaccum cleaner
+			 	self.EEInterface.toggle_vacuum(False)
+				return 5  
 		else:
-			next_state = 4
-
-		return next_state
-
+			# Could move the moving out of shelf commands here
+			"""			
+			self.armInterface.goOutsideShelf(0.35)
+			"""			
+			return 4
 
 	def state_4_depositing(self):
 		""" Coordination between arm movements and end effector to move picked up item from in front of
@@ -280,7 +363,9 @@ class StateMachine():
 			 return 5
 
 		#move arm to box
-		#self.armInterface.gotoBox()
+		"""
+		self.armInterface.gotoBox()
+		"""
 
 		#time.sleep(5)
 
@@ -301,11 +386,19 @@ class StateMachine():
 
 		# assumed item has dropped!!
 
+		# move to home position
+		"""
+		self.armInterface.goHomeFromBox()
+		"""
+
 		#goto end of run
 		return 5
 
 	def state_5_end_run(self):
 		"""Tasks to do at the end of attempting to pick and deposit an item"""
+
+		#Initialise the state
+		rospy.loginfo("State 5!")
 
 		#record outcome of run
 		if self.run_failure:
@@ -320,11 +413,15 @@ class StateMachine():
 		# move to home position
 		#self.armInterface.goHomeFromBox()
 
+
 		return 1
 
 
 	def state_6_completion(self):
 		""" Tasks to do upon completion, writes pickup output to file """
+		#Initialise the state
+		rospy.loginfo("State 6!")
+
 		with open('picked_status_single.json', 'w') as outfile:
 			json.dump(self.item_status, outfile)
 		rospy.loginfo("Results logged to file")
@@ -333,6 +430,8 @@ class StateMachine():
 
 	def state_7_done(self):
 		""" Holding state to enter into and wait until ros node shuts down or ctrl^c """
+		#Initialise the state
+		rospy.loginfo("State 7!")
 
 		return 7
 
@@ -382,7 +481,6 @@ class StateMachine():
 		target_item : result
 		})
 		pass
-
 
 
 if __name__ == "__main__":
