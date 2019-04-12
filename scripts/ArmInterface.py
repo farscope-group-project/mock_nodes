@@ -7,10 +7,10 @@ import tf
 import tf2_ros
 import tf2_geometry_msgs
 import sys
-import moveit_commander
-import moveit_msgs.msg
+#import moveit_commander
+#import moveit_msgs.msg
 from geometry_msgs.msg import Pose
-from moveit_commander.conversions import pose_to_list
+#from moveit_commander.conversions import pose_to_list
 from trajectory_msgs.msg import JointTrajectory,JointTrajectoryPoint
 from control_msgs.msg import FollowJointTrajectoryActionGoal
 
